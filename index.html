@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jukebox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0F1210; --surface: #171D18; --line: #2C362E;
+    --text: #EDEFE7; --text-dim: #9AA69C;
+    --gold: #C9A227; --gold-bright: #E3BC3E; --brick: #B23A2E; --teal: #5C6B63;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: radial-gradient(ellipse at 50% -10%, rgba(201,162,39,0.08), transparent 55%), var(--bg);
+    color: var(--text); font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh; padding: 0 0 80px;
+  }
+  a{ color: inherit; }
+  header{ padding: 46px 20px 30px; text-align: center; border-bottom: 1px solid var(--line); }
+  .marquee-label{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.3em; color:var(--gold); text-transform:uppercase; margin:0 0 10px; }
+  h1{ font-family:'Bebas Neue',sans-serif; font-weight:400; font-size:clamp(40px,11vw,64px); letter-spacing:0.03em; margin:0; line-height:0.95; color:var(--gold-bright); text-shadow:0 0 18px rgba(227,188,62,0.35), 0 0 2px rgba(227,188,62,0.6); }
+  .subtitle{ font-size:13px; color:var(--text-dim); margin:10px 0 0; font-family:'IBM Plex Mono',monospace; letter-spacing:0.04em; }
+
+  .slot-wrap{ max-width:640px; margin:28px auto 0; padding:0 20px; }
+  .slot{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .slot-row{ display:flex; gap:8px; }
+  .slot input{ flex:1; background:var(--bg); border:1px solid var(--line); border-radius:6px; color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:14px; padding:11px 12px; min-width:0; }
+  .slot input:focus{ outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold); }
+  .slot input::placeholder{ color:var(--teal); }
+  .fields{ display:flex; gap:8px; }
+  .fields input{ font-size:13px; }
+  button{ font-family:'IBM Plex Mono',monospace; cursor:pointer; }
+  .btn-add{ background:var(--gold); color:#14170F; border:none; border-radius:6px; padding:11px 18px; font-size:13px; font-weight:600; letter-spacing:0.04em; white-space:nowrap; }
+  .btn-add:hover{ background:var(--gold-bright); }
+  .btn-add:disabled{ opacity:0.5; cursor:default; }
+  .btn-add:focus-visible{ outline:2px solid var(--text); outline-offset:2px; }
+  .slot-status{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--text-dim); min-height:14px; padding-left:2px; }
+  .slot-status.err{ color:var(--brick); }
+
+  .admin-banner{ max-width:640px; margin:20px auto 0; padding:0 20px; }
+  .admin-banner-inner{ background:rgba(201,162,39,0.08); border:1px solid var(--gold); border-radius:8px; padding:12px 14px; font-size:12.5px; color:var(--gold-bright); font-family:'IBM Plex Mono',monospace; }
+  .json-out{ margin-top:12px; }
+  .json-out textarea{ width:100%; height:140px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; padding:10px; resize:vertical; }
+  .json-out .copy-btn{ margin-top:8px; background:var(--teal); color:#0F1210; border:none; border-radius:6px; padding:9px 14px; font-size:12px; font-weight:600; }
+
+  main{ max-width:640px; margin:34px auto 0; padding:0 20px; }
+  .count-ticker{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.15em; color:var(--text-dim); text-transform:uppercase; margin:0 0 12px; display:flex; justify-content:space-between; }
+  .empty{ text-align:center; padding:60px 20px; color:var(--text-dim); font-size:14px; border:1px dashed var(--line); border-radius:10px; }
+  .empty strong{ color:var(--gold); display:block; font-family:'Bebas Neue'; font-size:20px; letter-spacing:0.04em; margin-bottom:6px; }
+
+  ul.tracks{ list-style:none; margin:0; padding:0; }
+  .track{ border-bottom:1px solid var(--line); }
+  .track-row{ display:flex; align-items:center; gap:14px; padding:14px 4px; cursor:pointer; }
+  .track-row:focus-visible{ outline:2px solid var(--gold); outline-offset:-2px; border-radius:4px; }
+  .num{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--teal); width:22px; flex-shrink:0; text-align:right; }
+  .disc{ width:34px; height:34px; border-radius:50%; flex-shrink:0; background:radial-gradient(circle at center, var(--bg) 0 6px, var(--gold) 6.5px 7.5px, #0b0d0a 8px 60%); border:1px solid #000; }
+  .track.playing .disc{ animation: spin 2.4s linear infinite; box-shadow:0 0 10px rgba(201,162,39,0.5); }
+  @media (prefers-reduced-motion: reduce){ .track.playing .disc{ animation:none; } }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .meta{ flex:1; min-width:0; }
+  .title{ font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .artist{ font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .track.playing .title{ color:var(--gold-bright); }
+  .remove{ background:none; border:none; color:var(--teal); font-family:'IBM Plex Mono',monospace; font-size:16px; line-height:1; padding:6px 8px; flex-shrink:0; border-radius:4px; }
+  .remove:hover{ color:var(--brick); }
+
+  .player-wrap{ overflow:hidden; max-height:0; transition:max-height 0.28s ease; }
+  .track.playing .player-wrap{ max-height:260px; }
+  .player-inner{ padding:0 4px 18px 70px; }
+  .player-frame{ position:relative; width:100%; padding-top:56.25%; background:#000; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .player-frame iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+
+  footer{ max-width:640px; margin:40px auto 0; padding:0 20px; text-align:center; color:var(--teal); font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.05em; }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="marquee-label" id="marqueeLabel">Now Spinning</p>
+  <h1 id="siteTitle">The Jukebox</h1>
+  <p class="subtitle">a public collection of favorite songs</p>
+</header>
+
+<div class="admin-banner" id="adminBanner" style="display:none;">
+  <div class="admin-banner-inner">
+    ADMIN MODE — visitors don't see this. Add a song below, then copy the JSON it generates and paste it into <code>songs.json</code> in your GitHub repo to publish the update.
+  </div>
+</div>
+
+<div class="slot-wrap" id="slotWrap" style="display:none;">
+  <div class="slot">
+    <div class="slot-row">
+      <input id="urlInput" type="text" placeholder="Paste a YouTube link…" autocomplete="off" />
+      <button class="btn-add" id="addBtn">Add track</button>
+    </div>
+    <div class="fields" id="manualFields" style="display:none;">
+      <input id="titleInput" type="text" placeholder="Song title" />
+      <input id="artistInput" type="text" placeholder="Artist (optional)" />
+    </div>
+    <p class="slot-status" id="status"></p>
+    <div class="json-out" id="jsonOut" style="display:none;">
+      <textarea id="jsonText" readonly></textarea>
+      <button class="copy-btn" id="copyBtn">Copy updated songs.json</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <p class="count-ticker">
+    <span id="countLabel">00 TRACKS</span>
+    <span>PUBLIC COLLECTION</span>
+  </p>
+  <div id="listWrap"></div>
+</main>
+
+<footer>links play from youtube — nothing is copied or hosted here</footer>
+
+<script>
+(function(){
+  const isAdmin = new URLSearchParams(location.search).get('admin') === '1';
+  const urlInput = document.getElementById('urlInput');
+  const addBtn = document.getElementById('addBtn');
+  const statusEl = document.getElementById('status');
+  const manualFields = document.getElementById('manualFields');
+  const titleInput = document.getElementById('titleInput');
+  const artistInput = document.getElementById('artistInput');
+  const listWrap = document.getElementById('listWrap');
+  const countLabel = document.getElementById('countLabel');
+  const jsonOut = document.getElementById('jsonOut');
+  const jsonText = document.getElementById('jsonText');
+  const copyBtn = document.getElementById('copyBtn');
+
+  let tracks = [];
+  let playingId = null;
+
+  if(isAdmin){
+    document.getElementById('adminBanner').style.display = 'block';
+    document.getElementById('slotWrap').style.display = 'block';
+  }
+
+  function extractVideoId(url){
+    try{
+      const u = new URL(url.trim());
+      const host = u.hostname.replace('www.','').replace('m.','');
+      if(host === 'youtu.be') return u.pathname.slice(1).split('/')[0] || null;
+      if(host === 'youtube.com' || host === 'music.youtube.com'){
+        if(u.pathname === '/watch') return u.searchParams.get('v');
+        if(u.pathname.startsWith('/embed/')) return u.pathname.split('/')[2];
+        if(u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2];
+        if(u.pathname.startsWith('/live/')) return u.pathname.split('/')[2];
+      }
+      return null;
+    }catch(e){ return null; }
+  }
+
+  function setStatus(msg, isErr){
+    statusEl.textContent = msg || '';
+    statusEl.classList.toggle('err', !!isErr);
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  async function loadSongs(){
+    try{
+      const res = await fetch('songs.json', { cache: 'no-store' });
+      if(!res.ok) throw new Error('no songs.json');
+      tracks = await res.json();
+    }catch(e){
+      tracks = [];
+    }
+    render();
+  }
+
+  function render(){
+    countLabel.textContent = String(tracks.length).padStart(2,'0') + (tracks.length===1 ? ' TRACK' : ' TRACKS');
+    if(tracks.length === 0){
+      listWrap.innerHTML = '<div class="empty"><strong>Empty crate</strong>No songs yet.</div>';
+      return;
+    }
+    const html = tracks.map((t, i) => {
+      const playing = t.id === playingId;
+      return `
+      <li class="track${playing ? ' playing' : ''}" data-id="${t.id}">
+        <div class="track-row" tabindex="0" role="button" aria-expanded="${playing}">
+          <span class="num">${String(i+1).padStart(2,'0')}</span>
+          <span class="disc"></span>
+          <span class="meta">
+            <div class="title">${escapeHtml(t.title)}</div>
+            <div class="artist">${escapeHtml(t.artist || 'Unknown artist')}</div>
+          </span>
+          ${isAdmin ? `<button class="remove" aria-label="Remove ${escapeHtml(t.title)}" data-remove="${t.id}">✕</button>` : ''}
+        </div>
+        <div class="player-wrap">
+          <div class="player-inner">
+            <div class="player-frame">
+              ${playing ? `<iframe src="https://www.youtube.com/embed/${t.videoId}?autoplay=1" title="${escapeHtml(t.title)}" allow="autoplay; encrypted-media" allowfullscreen></iframe>` : ''}
+            </div>
+          </div>
+        </div>
+      </li>`;
+    }).join('');
+    listWrap.innerHTML = `<ul class="tracks">${html}</ul>`;
+
+    listWrap.querySelectorAll('.track-row').forEach(row => {
+      const id = row.closest('.track').dataset.id;
+      const toggle = () => { playingId = (playingId === id) ? null : id; render(); };
+      row.addEventListener('click', toggle);
+      row.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+    });
+    if(isAdmin){
+      listWrap.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-remove');
+          tracks = tracks.filter(t => t.id !== id);
+          if(playingId === id) playingId = null;
+          render();
+          showJson();
+        });
+      });
+    }
+  }
+
+  async function tryFetchOEmbed(videoId){
+    try{
+      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      if(!res.ok) throw new Error('oembed failed');
+      const data = await res.json();
+      return { title: data.title || '', artist: data.author_name || '' };
+    }catch(e){ return null; }
+  }
+
+  function showJson(){
+    jsonOut.style.display = 'block';
+    jsonText.value = JSON.stringify(tracks, null, 2);
+  }
+
+  async function handleAdd(){
+    const rawUrl = urlInput.value.trim();
+    if(!rawUrl){ setStatus('Paste a YouTube link first.', true); return; }
+    const videoId = extractVideoId(rawUrl);
+    if(!videoId){ setStatus('That doesn\'t look like a YouTube link.', true); return; }
+
+    if(manualFields.style.display !== 'none'){
+      const title = titleInput.value.trim();
+      if(!title){ setStatus('Add a song title to continue.', true); return; }
+      addTrack(videoId, title, artistInput.value.trim());
+      resetForm();
+      return;
+    }
+
+    addBtn.disabled = true;
+    setStatus('Looking up track info…');
+    const info = await tryFetchOEmbed(videoId);
+    addBtn.disabled = false;
+
+    if(info && info.title){
+      addTrack(videoId, info.title, info.artist);
+      resetForm();
+    }else{
+      manualFields.style.display = 'flex';
+      titleInput.focus();
+      setStatus('Couldn\'t auto-detect the title — enter it below.', false);
+    }
+  }
+
+  function addTrack(videoId, title, artist){
+    tracks.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      videoId, title, artist
+    });
+    render();
+    showJson();
+    setStatus('Added — copy the JSON below and publish it.');
+  }
+
+  function resetForm(){
+    urlInput.value = '';
+    titleInput.value = '';
+    artistInput.value = '';
+    manualFields.style.display = 'none';
+  }
+
+  if(isAdmin){
+    addBtn.addEventListener('click', handleAdd);
+    urlInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') handleAdd(); });
+    copyBtn.addEventListener('click', async () => {
+      try{
+        await navigator.clipboard.writeText(jsonText.value);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => copyBtn.textContent = 'Copy updated songs.json', 1500);
+      }catch(e){
+        jsonText.select();
+      }
+    });
+  }
+
+  loadSongs();
+})();
+</script>
+
+</body>
+</html>
